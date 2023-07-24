@@ -72,6 +72,10 @@ def style_transfer(content_image, style_image, image_size, content_weight,
         input_tensor.clamp_(0, 1)
 
     output_image = input_tensor.detach().cpu().squeeze().permute(1,2,0).numpy()*255
+
+    if preserve_color = True:
+        output_image = color_preserve(output_image, content_img, mask)
+        
     output_image = Image.fromarray(output_image.astype('uint8'))
     output_image.save(os.path.join(OUTPUT_DIR_PATH, 'result.png'))
 

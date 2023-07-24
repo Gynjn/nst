@@ -1,50 +1,38 @@
 import numpy as np
 from util import *
 from scipy import linalg as LG
-
-# calculates channel means covariance matrix for image of shape (..., 3) or (3, ...)
-def musigma(arr):
-  if arr.shape[2] == 3:
-    arr = arr.transpose(2, 0, 1)
-  narr = arr.reshape(3, -1)
-  mu = (narr.sum(axis = 1)/narr.shape[1]).reshape(-1,1)
-  sigma = np.matmul((narr - mu), (narr - mu).T) / narr.shape[1]
-  return mu, sigma
-
-# calculates transformation matrices for color histogram matching using 3D color matching formulations
-def image_analogies(carr, sarr):
-  cmu, csig = musigma(carr)
-  smu, ssig = musigma(sarr)
-  A = np.matmul(LG.fractional_matrix_power(csig,0.5), LG.fractional_matrix_power(ssig,-0.5))
-  b = cmu - np.matmul(A, smu)
-  return A, b
-
-def style_img_transform(carr, sarr):
-  if carr.shape[2] == 3:
-    carr = carr.transpose(2,0,1)
-  if sarr.shape[2] == 3:
-    sarr = sarr.transpose(2,0,1)
-    
-  A, b = image_analogies(carr, sarr)
-  
-  ss = sarr.reshape(3,-1)
-  n_ss = np.matmul(A, ss) + b
-  n_ss = n_ss.reshape(sarr.shape)
-  return n_ss.transpose(1,2,0)
+import cv2
 
 
-def original_color_transform(content, generated, mask=None):
-    generated = fromimage(toimage(generated, mode='RGB'), mode='YCbCr')  # Convert to YCbCr color space
+# matching yuv channel
+def color_preserve(output_image, content_img, mask=None):
+  '''
+  output image: numpy array
+  content_img: tensor
+  mask: numpy array
+  if white then mask value is 0, if not mask value is 255
+  '''
 
-    if mask is None:
-        generated[:, :, 1:] = content[:, :, 1:]  # Generated CbCr = Content CbCr
-    else:
-        width, height, channels = generated.shape
+  content_output = content_img.detach().cpu().squeeze().permute(1, 2, 0).numpy() * 255
+  output_yuv = cv2.cvtColor(np.float32(output_image), cv2.COLOR_RGB2YUV)
+  content_yuv = cv2.cvtColor(np.float32(output_image), cv2.COLOR_RGB2YUV)
+  # output_yuv = cv2.cvtColor(output_image, cv2.COLOR_RGB2YUV)
+  # content_yuv = cv2.cvtColor(output_image, cv2.COLOR_RGB2YUV)
 
-        for i in range(width):
-            for j in range(height):
-                if mask[i, j] == 1:
-                    generated[i, j, 1:] = content[i, j, 1:]
+  img_size = content_img.shape[1] # assume the width and height is same
 
-    generated = fromimage(toimage(generated, mode='YCbCr'), mode='RGB')  # Convert to RGB color space
-    return generated
+  # Only applying color preservation when the pixel is not white
+  if mask is not None:
+    mask = cv2.resize(mask, dsize=(img_size, img_size), interpolation=cv2.INTER_NEAREST)
+    output_yuv[:, :, 1:3] = np.where(mask[:, :, np.newaxis] == 255, content_yuv[:, :, 1:3], output_yuv[:, :, 1:3])  
+
+  else:
+    output_yuv[:, :, 1:3] = content_yuv[:,:,1:3]
+
+  output_image = cv2.cvtColor(output_yuv, cv2.COLOR_YUV2RGB)
+  output_image = np.clip(output_image, 0, 255).astype(np.uint8)
+
+  if mask is not None:
+    output_image = np.where(mask[:,:, np.newaxis] == 255, output_image, content_output)
+
+  return output_image

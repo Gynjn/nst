@@ -49,3 +49,21 @@ cv2.imwrite('Segmented Output.png', segmented_image)
 
 # cv2.imwrite('./imgs/background_mask.png', background_mask)
 
+
+'''
+white pixel and other
+if white then mask value is 0, if not mask value is 255
+'''
+
+# image = cv2.imread("./woman.jpg")
+
+# gray_image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+# height, width = gray_image.shape[:2]
+# mask = np.zeros((height, width), dtype=np.uint8)
+
+# for y in range(height):
+#     for x in range(width):
+#         if gray_image[y, x] < 255:
+#             mask[y, x] = 255
+
+# cv2.imwrite("./woman_mask.png", mask)
